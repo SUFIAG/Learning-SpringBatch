@@ -1,0 +1,46 @@
+version: "3"
+
+services:
+  database_spring:
+    image: mysql:8
+    ports:
+      - "3307:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DATABASE_SPRING_PASSWORD}
+    healthcheck:
+      test: [ "CMD", "mysqladmin" ,"ping", "-h", "localhost" ]
+      timeout: 20s
+      retries: 10
+  database_app:
+    image: mysql:8
+    ports:
+      - "3308:3306"
+    volumes:
+      - ./src/main/resources/scripts/database/database.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DATABASE_APP_PASSWORD}
+    healthcheck:
+      test: [ "CMD", "mysqladmin" ,"ping", "-h", "localhost" ]
+      timeout: 20s
+      retries: 10
+  app:
+    build:
+      context: .
+      args:
+        JOB_NAME: ${JOB_NAME}
+    ports:
+      - 8080:8080
+    volumes:
+      - ./files/output:/app/files/output
+    depends_on:
+      database_spring:
+        condition: service_healthy
+      database_app:
+        condition: service_healthy
+    environment:
+      DATABASE_SPRING_USERNAME: ${DATABASE_SPRING_USERNAME}
+      DATABASE_SPRING_PASSWORD: ${DATABASE_SPRING_PASSWORD}
+      SPRING_DATASOURCE_JDBC_URL: jdbc:mysql://database_spring:3306/spring_batch?createDatabaseIfNotExist=true&useUnicode=true&characterEncoding=UTF-8&useSSL=false&useTimezone=true&serverTimezone=UTC&allowPublicKeyRetrieval=true
+      DATABASE_APP_USERNAME: ${DATABASE_APP_USERNAME}
+      DATABASE_APP_PASSWORD: ${DATABASE_APP_PASSWORD}
+      APP_DATASOURCE_JDBC_URL: jdbc:mysql://database_app:3306/app_batch?createDatabaseIfNotExist=true&useUnicode=true&characterEncoding=UTF-8&useSSL=false&useTimezone=true&serverTimezone=UTC&allowPublicKeyRetrieval=true
